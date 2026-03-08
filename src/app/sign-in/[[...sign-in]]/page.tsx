@@ -1,0 +1,10 @@
+import { SignIn } from '@clerk/nextjs'
+
+export default function Page() {
+  return (
+    // 🚀 Added dark:bg-slate-950 so the background matches the Clerk box perfectly
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <SignIn />
+    </div>
+  )
+}
