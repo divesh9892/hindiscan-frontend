@@ -3,7 +3,8 @@
 import React, { useState, useRef } from "react";
 import { 
   CloudUpload, File, Trash2, Sparkles, 
-  Settings2, Key, FileJson, FileText 
+  Settings2, Key, FileJson, FileText,
+  ShieldCheck, Info
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -71,7 +72,7 @@ export default function DashboardPage() {
     toast.success("File attached successfully.");
   };
 
-  // --- MOCK SUBMISSION (We will wire FastAPI here next) ---
+  // --- MOCK SUBMISSION ---
   const handleAutoExtract = async () => {
     if (!file) return toast.error("Please upload a document first.");
     if (useCustomKey && !customApiKey) return toast.error("Please enter your Gemini API Key.");
@@ -79,7 +80,6 @@ export default function DashboardPage() {
     setIsProcessing(true);
     setProgress(0);
 
-    // Simulate a fluid progress bar loading
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 95) {
@@ -90,7 +90,6 @@ export default function DashboardPage() {
       });
     }, 200);
 
-    // Simulate API delay
     setTimeout(() => {
       clearInterval(interval);
       setProgress(100);
@@ -103,28 +102,33 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="mx-auto flex max-w-4xl flex-col min-h-[calc(100vh-8rem)] animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* HEADER SECTION */}
-      <div>
+      <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">New Extraction</h1>
         <p className="mt-2 text-slate-500 dark:text-slate-400">
           Upload your Hindi documents and let AI structure them into perfect Excel spreadsheets.
         </p>
       </div>
 
-      {/* TABS ARCHITECTURE (Psychological positioning: API First) */}
-      <Tabs defaultValue="auto" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="auto" className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4" /> AI Auto-Extract
+      {/* 🚀 TABS ARCHITECTURE (Perfectly Aligned & Sized) */}
+      <Tabs defaultValue="auto" className="w-full flex-1">
+        <TabsList className="grid w-full max-w-xl grid-cols-2 h-14 p-1">
+          <TabsTrigger value="auto" className="flex items-center justify-center gap-1.5 h-full data-[state=active]:shadow-md transition-all">
+            <Sparkles className="h-4 w-4 text-blue-500 shrink-0" /> 
+            <span className="font-semibold text-sm md:text-base">AI Auto-Extract</span>
+            <span className="hidden rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold tracking-wider text-blue-700 dark:bg-blue-900/60 dark:text-blue-300 md:inline-block">
+              (RECOMMENDED)
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="manual" className="flex items-center gap-2">
-            <FileJson className="h-4 w-4" /> Manual JSON
+          <TabsTrigger value="manual" className="flex items-center justify-center gap-2 h-full data-[state=active]:shadow-md transition-all">
+            <FileJson className="h-4 w-4 shrink-0" /> 
+            <span className="font-semibold text-sm md:text-base">Manual JSON</span>
           </TabsTrigger>
         </TabsList>
 
-        {/* 🚀 TAB 1: AI AUTO-EXTRACT (The Premium Experience) */}
+        {/* TAB 1: AI AUTO-EXTRACT */}
         <TabsContent value="auto" className="mt-6 space-y-6">
           
           {/* DRAG AND DROP ZONE */}
@@ -164,15 +168,13 @@ export default function DashboardPage() {
 
           {/* SETTINGS MODULE */}
           <div className="grid gap-6 md:grid-cols-2">
-            
-            {/* Extraction Preferences */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base"><Settings2 className="h-4 w-4" /> Extraction Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="tables-only" className="flex flex-col space-y-1">
+                  <Label htmlFor="tables-only" className="flex flex-col items-start space-y-1 text-left">
                     <span>Extract Tables Only</span>
                     <span className="font-normal text-xs text-slate-500">Ignores paragraphs & headers</span>
                   </Label>
@@ -180,7 +182,7 @@ export default function DashboardPage() {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="legacy-font" className="flex flex-col space-y-1">
+                  <Label htmlFor="legacy-font" className="flex flex-col items-start space-y-1 text-left">
                     <span>Enable Legacy Fonts</span>
                     <span className="font-normal text-xs text-slate-500">Apply Kruti Dev / DevLys</span>
                   </Label>
@@ -203,7 +205,6 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* BYOK (Bring Your Own Key) */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base"><Key className="h-4 w-4" /> API Key Override</CardTitle>
@@ -211,7 +212,9 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="custom-key-toggle">Use Custom API Key</Label>
+                  <Label htmlFor="custom-key-toggle" className="flex flex-col items-start space-y-1 text-left">
+                    <span>Use Custom API Key</span>
+                  </Label>
                   <Switch id="custom-key-toggle" checked={useCustomKey} onCheckedChange={setUseCustomKey} />
                 </div>
                 {useCustomKey && (
@@ -223,11 +226,33 @@ export default function DashboardPage() {
                       value={customApiKey}
                       onChange={(e) => setCustomApiKey(e.target.value)}
                     />
-                    <p className="mt-2 text-xs text-slate-500">Zero-Trust: Your key never leaves browser memory.</p>
+                    <p className="mt-2 text-xs text-slate-500 text-left">Zero-Trust: Your key never leaves browser memory.</p>
                   </div>
                 )}
               </CardContent>
             </Card>
+          </div>
+
+          {/* ELEGANT NOTICES */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/30 dark:bg-green-900/10">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-600 dark:text-green-500" />
+              <div className="text-left">
+                <h4 className="text-sm font-semibold text-green-900 dark:text-green-400">Privacy & Security</h4>
+                <p className="mt-1 text-xs text-green-700 dark:text-green-500/80">
+                  Your file is processed securely in temporary memory and is <b>instantly deleted</b> from our servers the moment your Excel file is generated. We do not store your documents.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/30 dark:bg-blue-900/10">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-500" />
+              <div className="text-left">
+                <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-400">AI Confidence</h4>
+                <p className="mt-1 text-xs text-blue-700 dark:text-blue-500/80">
+                  This system uses advanced Vision AI to process complex layouts. While highly accurate, poor image lighting or illegible handwriting may occasionally affect the output.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* ACTION BUTTON & PROGRESS */}
@@ -235,7 +260,7 @@ export default function DashboardPage() {
             {isProcessing && (
               <div className="space-y-2 animate-in fade-in">
                 <div className="flex justify-between text-sm font-medium">
-                  <span>AI is processing document...</span>
+                  <span>AI is analyzing document...</span>
                   <span>{progress}%</span>
                 </div>
                 <Progress value={progress} className="h-2" />
@@ -253,18 +278,55 @@ export default function DashboardPage() {
 
         </TabsContent>
 
-        {/* 🚀 TAB 2: MANUAL JSON (The "Tedious" Fallback) */}
+        {/* TAB 2: MANUAL JSON */}
         <TabsContent value="manual" className="mt-6 space-y-6 animate-in fade-in duration-500">
+          
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/30 dark:bg-amber-900/10 text-left">
+            <h4 className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-500">
+              <Info className="h-5 w-5" /> How to use this manual tool
+            </h4>
+            <p className="mt-2 text-sm text-amber-800 dark:text-amber-500/80">
+              Go to an AI like ChatGPT or Gemini, upload your document, and ask it to extract the data using the exact JSON Schema format below. Once the AI generates the JSON, paste it into the box to compile your Excel file.
+            </p>
+            <details className="group mt-4 cursor-pointer">
+              <summary className="text-sm font-medium text-amber-700 outline-none hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-300">
+                👉 Click to View Expected JSON Structure
+              </summary>
+              <pre className="mt-3 overflow-x-auto rounded-md bg-slate-900 p-4 text-xs text-slate-50 dark:bg-slate-950">
+{`{
+  "recommended_filename": "Short_Descriptive_Name",
+  "document": {
+    "main_title": {
+      "text": "Extracted main title here",
+      "is_bold": true,
+      "font_size": 14
+    },
+    "subtitles": [],
+    "tables": [
+      {
+        "table_id": 1,
+        "table_title": "",
+        "headers": [{"column_name": "Header 1", "is_bold": true}],
+        "rows": [["Row 1 Col 1 Value"]]
+      }
+    ],
+    "footer": {"text": "", "is_bold": false, "font_size": 11}
+  }
+}`}
+              </pre>
+            </details>
+          </div>
+
           <Card>
-            <CardHeader>
-              <CardTitle>Manual JSON Generation</CardTitle>
+            <CardHeader className="text-left">
+              <CardTitle>JSON Payload</CardTitle>
               <CardDescription>
-                Already have structured JSON from ChatGPT or Gemini? Paste it here to generate your Excel file.
+                Paste your structured JSON payload below.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Textarea 
-                placeholder='{\n  "recommended_filename": "Report",\n  "document": { ... }\n}'
+                placeholder={`{\n  "recommended_filename": "Report_Name",\n  "document": {\n    "main_title": { "text": "..." }\n  }\n}`}
                 className="min-h-[300px] font-mono text-sm"
                 value={jsonInput}
                 onChange={(e) => setJsonInput(e.target.value)}
@@ -277,6 +339,12 @@ export default function DashboardPage() {
         </TabsContent>
 
       </Tabs>
+
+      {/* FOOTER */}
+      <footer className="mt-auto border-t pt-6 pb-2 text-center text-sm text-slate-500 dark:text-slate-400">
+        Made with ❤️ by Divesh | Powered by Gemini VLM Architecture
+      </footer>
+
     </div>
   );
 }
