@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CreditBadge } from "@/components/credit-badge";
 import {
   Sheet,
   SheetContent,
@@ -76,9 +77,7 @@ export default function DashboardLayout({
 
           {/* RIGHT SIDE ACTIONS */}
           <div className="flex items-center justify-end gap-3 md:gap-4">
-            <Badge variant="secondary" className="font-mono text-xs md:text-sm">
-              Credits: 3
-            </Badge>
+            <CreditBadge />
             <ThemeToggle />
             <UserButton />
           </div>
