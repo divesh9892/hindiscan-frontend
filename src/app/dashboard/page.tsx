@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { 
   CloudUpload, File, Trash2, Sparkles, 
   Settings2, Key, FileJson, FileText,
   ShieldCheck, Info
 } from "lucide-react";
 import { toast } from "sonner";
+
+// 🚀 1. SECURE API CLIENT IMPORTED HERE
+import { useApiClient } from "@/lib/apiClient"; 
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +21,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function DashboardPage() {
+  // 🚀 2. API CLIENT INITIALIZED
+  const api = useApiClient(); 
+
   // --- UI STATE ---
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -35,9 +41,19 @@ export default function DashboardPage() {
   // --- MANUAL JSON STATE ---
   const [jsonInput, setJsonInput] = useState("");
 
-  // --- PROGRESS STATE ---
+  // --- 🚀 NEW: DUAL PROGRESS STATE ---
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [aiProgress, setAiProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState("");
+
+  // Clean up polling intervals if user navigates away mid-extraction
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    };
+  }, []);
 
   // --- DRAG & DROP HANDLERS ---
   const handleDragOver = (e: React.DragEvent) => {
@@ -72,33 +88,143 @@ export default function DashboardPage() {
     toast.success("File attached successfully.");
   };
 
-  // --- MOCK SUBMISSION ---
+  // 🚀 3. REAL-TIME ASYNC EXTRACTION SYSTEM (TICKET POLLING)
   const handleAutoExtract = async () => {
     if (!file) return toast.error("Please upload a document first.");
     if (useCustomKey && !customApiKey) return toast.error("Please enter your Gemini API Key.");
 
     setIsProcessing(true);
-    setProgress(0);
+    setUploadProgress(0);
+    setAiProgress(0);
+    setStatusMessage("Encrypting and uploading to secure vault...");
 
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 95) {
-          clearInterval(interval);
-          return 95;
-        }
-        return prev + 5;
+    try {
+      // STEP 1: UPLOAD & GET TASK ID
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("extract_tables_only", extractTablesOnly.toString());
+      formData.append("use_legacy_font", useLegacyFont.toString());
+      formData.append("legacy_font_name", legacyFontName);
+      
+      if (useCustomKey && customApiKey) {
+        formData.append("custom_api_key", customApiKey);
+      }
+
+      const startRes = await api.post("/extract/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+          setUploadProgress(percentCompleted);
+        },
       });
-    }, 200);
 
-    setTimeout(() => {
-      clearInterval(interval);
-      setProgress(100);
-      toast.success("Excel report generated successfully!");
-      setTimeout(() => {
-        setIsProcessing(false);
-        setProgress(0);
-      }, 1000);
-    }, 4000);
+      const taskId = startRes.data.task_id;
+      setStatusMessage("AI Initializing...");
+
+      // STEP 2: POLL FOR LIVE UPDATES EVERY 1.5 SECONDS
+      pollingIntervalRef.current = setInterval(async () => {
+        try {
+          const statusRes = await api.get(`/extract/status/${taskId}`);
+          const { status, progress, message } = statusRes.data;
+          
+          setAiProgress(progress);
+          setStatusMessage(message);
+
+          if (status === "completed") {
+            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+            setStatusMessage("Downloading Excel Report...");
+            
+            // STEP 3: DOWNLOAD THE BLOB
+            const downloadRes = await api.get(`/extract/download/${taskId}`, {
+              responseType: "blob",
+            });
+
+            const url = window.URL.createObjectURL(new Blob([downloadRes.data]));
+            const link = document.createElement("a");
+            link.href = url;
+            
+            let filename = "HindiScan_Report.xlsx";
+            const disposition = downloadRes.headers["content-disposition"];
+            if (disposition && disposition.includes("attachment")) {
+              const matches = /filename\*?=['"]?(?:UTF-\d['"]*)?([^;\r\n"']*)['"]?/i.exec(disposition);
+              if (matches && matches[1]) {
+                filename = decodeURIComponent(matches[1]);
+              }
+            }
+            
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            
+            toast.success("Excel report generated successfully!");
+            window.dispatchEvent(new Event("refreshCredits"));
+            setFile(null);
+            setIsProcessing(false);
+          } else if (status === "failed") {
+            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+            toast.error(`Extraction failed: ${message}`);
+            setIsProcessing(false);
+          }
+        } catch (pollError) {
+          console.error("Polling error", pollError);
+        }
+      }, 1500); 
+
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      const errorMessage = error.response?.data?.detail || "An unexpected error occurred during upload.";
+      toast.error(`Start failed: ${errorMessage}`);
+      setIsProcessing(false);
+    }
+  };
+
+  // 🚀 4. REAL FASTAPI SUBMISSION (Manual JSON)
+  const handleManualJson = async () => {
+    if (!jsonInput.trim()) return toast.error("Please paste your JSON payload first.");
+
+    setIsProcessing(true);
+    setUploadProgress(100);
+    setAiProgress(30);
+    setStatusMessage("Compiling JSON to Excel...");
+
+    try {
+      let parsedJson;
+      try {
+        parsedJson = JSON.parse(jsonInput);
+      } catch (e) {
+        throw new Error("Invalid JSON format. Please check your syntax.");
+      }
+
+      setAiProgress(60);
+
+      const response = await api.post("/extract/manual/", {
+        payload: parsedJson,
+        use_legacy_font: useLegacyFont,
+        legacy_font_name: legacyFontName
+      }, {
+        responseType: "blob",
+      });
+
+      setAiProgress(100);
+      setStatusMessage("Download complete!");
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "Manual_HindiScan_Report.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      toast.success("Excel report generated from JSON successfully!");
+    } catch (error: any) {
+      console.error("Manual JSON error:", error);
+      const errorMessage = error.message || error.response?.data?.detail || "An unexpected error occurred.";
+      toast.error(`Generation failed: ${errorMessage}`);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -112,19 +238,21 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* 🚀 TABS ARCHITECTURE (Perfectly Aligned & Sized) */}
+      {/* TABS ARCHITECTURE */}
       <Tabs defaultValue="auto" className="w-full flex-1">
         <TabsList className="grid w-full max-w-xl grid-cols-2 h-14 p-1">
-          <TabsTrigger value="auto" className="flex items-center justify-center gap-1.5 h-full data-[state=active]:shadow-md transition-all">
-            <Sparkles className="h-4 w-4 text-blue-500 shrink-0" /> 
-            <span className="font-semibold text-sm md:text-base">AI Auto-Extract</span>
-            <span className="hidden rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold tracking-wider text-blue-700 dark:bg-blue-900/60 dark:text-blue-300 md:inline-block">
-              (RECOMMENDED)
-            </span>
+          <TabsTrigger value="auto" className="flex items-center justify-center gap-2 h-full data-[state=active]:shadow-md transition-all">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-blue-500 shrink-0" /> 
+              <span className="font-semibold text-sm md:text-base leading-none translate-y-[1px]">AI Auto-Extract</span>
+            </div>
+            <div className="hidden md:flex h-5 items-center justify-center rounded-full bg-blue-100 px-2 text-[9px] font-bold tracking-wider text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
+              <span className="translate-y-[1px]">(RECOMMENDED)</span>
+            </div>
           </TabsTrigger>
           <TabsTrigger value="manual" className="flex items-center justify-center gap-2 h-full data-[state=active]:shadow-md transition-all">
             <FileJson className="h-4 w-4 shrink-0" /> 
-            <span className="font-semibold text-sm md:text-base">Manual JSON</span>
+            <span className="font-semibold text-sm md:text-base leading-none translate-y-[1px]">Manual JSON</span>
           </TabsTrigger>
         </TabsList>
 
@@ -158,7 +286,7 @@ export default function DashboardPage() {
                       <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => setFile(null)} className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 shrink-0">
+                  <Button variant="ghost" size="icon" onClick={() => setFile(null)} className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 shrink-0" disabled={isProcessing}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -178,7 +306,7 @@ export default function DashboardPage() {
                     <span>Extract Tables Only</span>
                     <span className="font-normal text-xs text-slate-500">Ignores paragraphs & headers</span>
                   </Label>
-                  <Switch id="tables-only" checked={extractTablesOnly} onCheckedChange={setExtractTablesOnly} />
+                  <Switch id="tables-only" checked={extractTablesOnly} onCheckedChange={setExtractTablesOnly} disabled={isProcessing} />
                 </div>
                 
                 <div className="flex items-center justify-between">
@@ -186,12 +314,12 @@ export default function DashboardPage() {
                     <span>Enable Legacy Fonts</span>
                     <span className="font-normal text-xs text-slate-500">Apply Kruti Dev / DevLys</span>
                   </Label>
-                  <Switch id="legacy-font" checked={useLegacyFont} onCheckedChange={setUseLegacyFont} />
+                  <Switch id="legacy-font" checked={useLegacyFont} onCheckedChange={setUseLegacyFont} disabled={isProcessing} />
                 </div>
 
                 {useLegacyFont && (
                   <div className="animate-in fade-in slide-in-from-top-2 pt-2">
-                    <Select value={legacyFontName} onValueChange={setLegacyFontName}>
+                    <Select value={legacyFontName} onValueChange={setLegacyFontName} disabled={isProcessing}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select Font Format" />
                       </SelectTrigger>
@@ -215,16 +343,17 @@ export default function DashboardPage() {
                   <Label htmlFor="custom-key-toggle" className="flex flex-col items-start space-y-1 text-left">
                     <span>Use Custom API Key</span>
                   </Label>
-                  <Switch id="custom-key-toggle" checked={useCustomKey} onCheckedChange={setUseCustomKey} />
+                  <Switch id="custom-key-toggle" checked={useCustomKey} onCheckedChange={setUseCustomKey} disabled={isProcessing} />
                 </div>
                 {useCustomKey && (
                   <div className="animate-in fade-in slide-in-from-top-2 pt-2">
                     <input 
                       type="password" 
                       placeholder="Paste Gemini API Key..." 
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 dark:border-slate-800 dark:bg-slate-950 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300"
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 dark:border-slate-800 dark:bg-slate-950 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300 disabled:opacity-50"
                       value={customApiKey}
                       onChange={(e) => setCustomApiKey(e.target.value)}
+                      disabled={isProcessing}
                     />
                     <p className="mt-2 text-xs text-slate-500 text-left">Zero-Trust: Your key never leaves browser memory.</p>
                   </div>
@@ -255,17 +384,33 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ACTION BUTTON & PROGRESS */}
+          {/* 🚀 THE NEW DUAL PROGRESS BAR UI */}
           <div className="space-y-4 pt-4">
             {isProcessing && (
-              <div className="space-y-2 animate-in fade-in">
-                <div className="flex justify-between text-sm font-medium">
-                  <span>AI is analyzing document...</span>
-                  <span>{progress}%</span>
+              <div className="space-y-4 animate-in fade-in zoom-in-95 rounded-lg border bg-slate-50 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+                {/* Network Upload Progress */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
+                    <span>Network Upload</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <Progress value={uploadProgress} className="h-1.5" />
                 </div>
-                <Progress value={progress} className="h-2" />
+
+                {/* AI Progress */}
+                <div className="space-y-2 pt-2">
+                  <div className="flex justify-between text-sm font-semibold text-blue-700 dark:text-blue-400">
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 animate-pulse" />
+                      {statusMessage}
+                    </span>
+                    <span>{aiProgress}%</span>
+                  </div>
+                  <Progress value={aiProgress} className="h-2.5" />
+                </div>
               </div>
             )}
+
             <Button 
               size="lg" 
               className="w-full text-base font-semibold shadow-lg transition-all hover:scale-[1.01]"
@@ -327,11 +472,12 @@ export default function DashboardPage() {
             <CardContent className="space-y-4">
               <Textarea 
                 placeholder={`{\n  "recommended_filename": "Report_Name",\n  "document": {\n    "main_title": { "text": "..." }\n  }\n}`}
-                className="min-h-[300px] font-mono text-sm"
+                className="min-h-[300px] font-mono text-sm disabled:opacity-50"
                 value={jsonInput}
                 onChange={(e) => setJsonInput(e.target.value)}
+                disabled={isProcessing}
               />
-              <Button size="lg" variant="secondary" className="w-full" disabled={!jsonInput || isProcessing} onClick={() => toast.info("Manual generation will be wired up next!")}>
+              <Button size="lg" variant="secondary" className="w-full" disabled={!jsonInput || isProcessing} onClick={handleManualJson}>
                 <FileText className="mr-2 h-4 w-4" /> Generate Excel from JSON
               </Button>
             </CardContent>
