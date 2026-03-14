@@ -144,7 +144,7 @@ export default async function LandingPage() {
               {/* 🚀 FIX 4: Rephrased Security section to focus on Ephemeral Storage */}
               <h3 className="mb-2 text-xl font-semibold">Ephemeral Storage</h3>
               <p className="text-slate-600 dark:text-slate-400">
-                Your privacy matters. Documents are processed securely and permanently deleted from our servers the moment your extraction is complete.
+                Your privacy matters. Documents are processed securely in temporary memory and are permanently auto-shredded from our servers exactly 15 minutes after extraction.
               </p>
             </div>
           </div>
