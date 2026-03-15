@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4 # 🚀 Bumped to v4 for latest security
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4 # 🚀 Bumped to v4 to perfectly support Node 22
         with:
           node-version: "22"
           cache: "npm"
@@ -23,10 +23,11 @@ jobs:
         run: npm ci
 
       - name: Run Linter
-        run: npm run lint
+        run: npm run lint # 🚀 Keeping this because you crushed those errors like a pro!
 
       - name: Test Production Build
         env:
+          # 🚀 FIX: Perfectly matches your apiClient.ts and local .env!
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder"
-          NEXT_PUBLIC_API_URL: "http://localhost:8400/api/v1"
+          NEXT_PUBLIC_API_BASE_URL: "http://localhost:8000/api/v1"
         run: npm run build
