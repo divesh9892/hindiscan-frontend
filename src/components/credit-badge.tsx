@@ -18,7 +18,7 @@ export function CreditBadge() {
       try {
         const res = await api.get("/users/me"); 
         setCredits(res.data.credit_balance);
-      } catch (e) {
+      } catch {
         console.error("Failed to fetch credits");
       }
     };

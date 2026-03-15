@@ -76,7 +76,7 @@ export default function BillingPage() {
 
       setHasMore(pagination.has_more);
       setNextCursor(pagination.next_cursor);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to fetch billing history:", error);
       toast.error("Failed to load billing history.");
     } finally {
@@ -138,8 +138,9 @@ export default function BillingPage() {
         orderId: order_id,
         amount: amount / 100, 
       });
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || "Failed to initialize checkout.", { id: "checkout" });
+    } catch (error) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      toast.error(err.response?.data?.detail || "Failed to initialize checkout.", { id: "checkout" });
     } finally {
       setIsProcessingCheckout(false);
     }
@@ -170,8 +171,9 @@ export default function BillingPage() {
       window.dispatchEvent(new Event("refreshCredits"));
       fetchTransactions(); 
 
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || "Payment verification failed.", { id: "verify" });
+    } catch (error) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      toast.error(err.response?.data?.detail || "Payment verification failed.", { id: "verify" });
     } finally {
       setIsProcessingCheckout(false);
       setCheckoutState({ isOpen: false, planId: "", orderId: "", amount: 0 });
@@ -194,8 +196,13 @@ export default function BillingPage() {
       setTargetEmail("");
       fetchTransactions(); 
       window.dispatchEvent(new Event("refreshCredits")); 
-    } catch (error: any) {
-      toast.error(error.response?.status === 429 ? "Too many requests! Please wait a minute." : error.response?.data?.detail || "Failed to grant credits.");
+    } catch (error) {
+      const err = error as { response?: { status?: number; data?: { detail?: string } } };
+      toast.error(
+        err.response?.status === 429 
+          ? "Too many requests! Please wait a minute." 
+          : err.response?.data?.detail || "Failed to grant credits."
+      );
     } finally {
       setIsGranting(false);
     }

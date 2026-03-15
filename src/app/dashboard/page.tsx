@@ -134,7 +134,7 @@ export default function DashboardPage() {
       link.click();
       link.remove();
       toast.success("Excel file downloaded!", { id: "download" });
-    } catch (error) {
+    } catch {
       toast.error("Failed to download Excel file.", { id: "download" });
     }
   };
@@ -187,7 +187,7 @@ export default function DashboardPage() {
             try {
               const jsonRes = await api.get(`/extract/json/${taskId}`);
               setRawJson(JSON.stringify(jsonRes.data, null, 2));
-            } catch (jsonErr) {
+            } catch {
               setRawJson(JSON.stringify({ error: "JSON data could not be retrieved from the server." }, null, 2));
             }
 
@@ -206,10 +206,11 @@ export default function DashboardPage() {
         }
       }, 1500); 
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Upload error:", error);
-      const errorMessage = error.response?.data?.detail || "An unexpected error occurred during upload.";
-      toast.error(`Start failed: ${errorMessage}`);
+      const err = error as { response?: { status?: number; data?: { detail?: string } } };
+      //const errorMessage = error.response?.data?.detail || "An unexpected error occurred during upload.";
+      toast.error(`Start failed: ${err}`);
       setIsProcessing(false);
     }
   };
@@ -268,21 +269,22 @@ export default function DashboardPage() {
       window.URL.revokeObjectURL(url);
 
       toast.success("Excel report generated from JSON successfully!");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Manual JSON error:", error);
       
-      // 🚀 LOOPHOLE CLOSED: Safely parse API error details when responseType is "blob"
-      let errorMessage = error.message || "An unexpected error occurred.";
-      if (error.response?.data instanceof Blob) {
+      const err = error as { message?: string; response?: { data?: { detail?: string } | Blob } };
+      let errorMessage = err.message || "An unexpected error occurred.";
+      
+      if (err.response?.data instanceof Blob) {
         try {
-          const errorText = await error.response.data.text();
+          const errorText = await err.response.data.text();
           const errorJson = JSON.parse(errorText);
           errorMessage = errorJson.detail || errorMessage;
-        } catch (e) {
-          console.error("Failed to parse blob error", e);
+        } catch {
+          console.error("Failed to parse blob error");
         }
       } else {
-        errorMessage = error.response?.data?.detail || errorMessage;
+        errorMessage = err.response?.data?.detail || errorMessage;
       }
 
       toast.error(`Generation failed: ${errorMessage}`);
