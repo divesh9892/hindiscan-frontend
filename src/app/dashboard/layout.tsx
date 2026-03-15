@@ -2,7 +2,6 @@ import { UserButton } from "@clerk/nextjs";
 import { FileText, History, Menu } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CreditBadge } from "@/components/credit-badge";
 import {

@@ -227,7 +227,7 @@ export default function DashboardPage() {
       let parsedJson;
       try {
         parsedJson = JSON.parse(jsonInput);
-      } catch (e) {
+      } catch {
         throw new Error("Invalid JSON format. Please check your syntax.");
       }
 
